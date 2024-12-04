@@ -126,18 +126,26 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 	int i, j, k, l;
 	float medianaMax, medianaMin, medianaC;
 	int gmax, gmin, indMedianaC;
+	//recorrer la matriz de enfermedades por columnas
 	for(i=0;i<TENF;i++){
+		//por cada tipo de enfermedad inicializar la mediana max y mediana min
 		medianaMax=-1;
 		medianaMin=FLT_MAX;
 		gmax=-1;
 		gmin=-1;
+		//recorrer cada cluster
 		for(j=0;j<ngrupos;j++){
+			//solo ejectutar si la cantidad de elementos en el cluster es mayor que 0
 			if(listag[j].nelemg>0){
+				//inicializar un array para guardar el numero de probabiliad para conseguir la enfermedad[i] para cada cluster[j]
 				float enf_per[listag[j].nelemg];
+				//guardar todas las personas en el array
 				for(k=0;k<listag[j].nelemg;k++){
 					enf_per[k] = enf[listag[j].elemg[k]][i];
 				}
+				//ordenar el array de menor a mayor
 				qsort(enf_per,listag[j].nelemg,sizeof(float),compare_floats);
+				//conseguir la mediana maxima y minima de esa enfermedad y a que cluster pertenece
 				indMedianaC = floor(listag[j].nelemg / 2);
 				medianaC = enf_per[indMedianaC];
 				if(medianaC > medianaMax){
