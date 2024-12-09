@@ -1,7 +1,9 @@
+
+
 // head -n+1001 dbenf.dat > dbenf1000.dat
 // head -n+1001 dbgen.dat > dbgen1000.dat
 // ./gengrupos ./data/dbgen1000.dat ./data/dbenf1000.dat 1000
-/* 
+/*
     gengrupos_s.c   SERIE
 
     Entrada: dbgen.dat    fichero con la informacion genetica de cada muestra
@@ -24,7 +26,9 @@ struct lista_grupos listag[MAX_GRUPOS];   // lista de elementos de los grupos
 float  enf[MAXE][TENF];                // enfermedades asociadas a las muestras
 struct  analisis prob_enf[TENF];       // analisis de los tipos de enfermedades
 
+
 int ngrupos = 30;
+struct timespec t0;
 
 void error_fscanf_escritura(FILE *fd, int nwrite, char *nomfich);
 
@@ -117,7 +121,6 @@ int main (int argc, char *argv[]) {
 			num_ite++;
 		}
 
-
 		// B. Calcular la "calidad" del agrupamiento
 		// ==========================================
 
@@ -129,7 +132,7 @@ int main (int argc, char *argv[]) {
 			listag[grupo].elemg[num] = i;  // elementos de cada grupo (cluster)
 			listag[grupo].nelemg++;
 		}
-		
+
 		// silhouette simple: calidad de la particion
 		sil = silhouette_simple(elem, listag, cent, densidad);
 

@@ -1,13 +1,17 @@
 /*
     AC - OpenMP -- SERIE
     fun_s.c
-     rutinas que se utilizan en el modulo gengrupos_s.c 
+     rutinas que se utilizan en el modulo gengrupos_s.c
 ****************************************************************************/
 #include <math.h>
 #include <float.h> // DBL_MAX
 #include <stdlib.h>
 #include "defineg.h"           // definiciones
 #include <stdio.h>
+#include <omp.h>
+#include <time.h>
+
+
 /**************************************************************************************
    1 - Funcion para calcular la distancia genetica entre dos elementos (distancia euclidea)
        Entrada:  2 elementos con NCAR caracteristicas (por referencia)
@@ -17,11 +21,13 @@ double gendist (float *elem1, float *elem2)
 {
 	// PARA COMPLETAR
 	// calcular la distancia euclidea entre dos vectores
+
 	float sum = 0.0;
 	int i;
 	for(i=0;i<NCAR;i++){
 		sum = sum + pow((elem1[i]-elem2[i]),2);
 	}
+
 	return sqrt(sum);
 }
 
@@ -38,6 +44,9 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 	// popul: grupo mas cercano a cada elemento
 	int i, j, centroide_cercano;
 	float dist_min, aux_dist, centroide_ind = -1;
+	#pragma omp parallel private(i,j,aux_dist,centroide_ind) reduction(min:dist_min) num_threads(8)
+    {
+    #pragma omp for schedule(static)
 	for(i=0;i<nelem;i++){
 		dist_min = FLT_MAX;
 		for(j=0;j<ngrupos;j++){
@@ -48,6 +57,7 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 			}
 		}
 		popul[i] = centroide_ind;
+	}
 	}
 }
 
@@ -71,38 +81,55 @@ double silhouette_simple(float elem[][NCAR], struct lista_grupos *listag, float 
 
 	int i, j, k, elemJ, elemK;
 	double sumA, sumB, S=0;
+	struct lista_grupos listaAct;
+    #pragma omp parallel private(listaAct,i,j,k,sumA,elemJ,elemK) shared(a) num_threads(8)
+        {
+        #pragma omp for schedule(static,1)
 	for(i=0;i<ngrupos;i++){
 		sumA = 0;
-		if(listag[i].nelemg == 1 || listag[i].nelemg == 0){
+        listaAct = listag[i];
+		if(listaAct.nelemg<=1){
 			a[i] = 0;
 		}else{
-			for(j=0;j<listag[i].nelemg;j++){
-				elemJ = listag[i].elemg[j];
-				for(k=0;k<listag[i].nelemg;k++){
-					elemK = listag[i].elemg[k];
-					if(j!=k) sumA += gendist(elem[elemJ],elem[elemK]);
+			for(j=0;j<listaAct.nelemg;j++){
+				elemJ = listaAct.elemg[j];
+				for(k=0;k<listaAct.nelemg;k++){
+					elemK = listaAct.elemg[k];
+					if(j!=k) {
+                        sumA += gendist(elem[elemJ],elem[elemK]);
+                    }
 				}
 			}
-			a[i] = sumA / pow(listag[i].nelemg,2);
+			a[i] = sumA / pow(abs(listaAct.nelemg),2.0);
 		}
 	}
+    }
+
+
     // aproximar b[i] de cada cluster
+    #pragma omp parallel private(i,j,sumB) shared(b) num_threads(8)
+      {
+     #pragma omp for schedule(static)
 	for(i=0;i<ngrupos;i++){
 		sumB = 0;
 		for (j=0;j<ngrupos;j++){
 			if(i!=j) sumB += gendist(cent[i],cent[j]);
 		}
-		b[i] = sumB / (ngrupos-1);
+		b[i] = sumB / (abs(ngrupos)-1);
 	}
+    }
+
 	// calcular el ratio s[i] de cada cluster
 	for(i=0;i<ngrupos;i++){
 		s[i] = (b[i]-a[i])/ fmax(a[i],b[i]);
 		S += s[i];
-	}
+	 }
+
+
 
 	// promedio y devolver
 
-    return S/ngrupos;
+    return S/abs(ngrupos);
 }
 
 /********************************************************************************************
@@ -127,6 +154,10 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 	float medianaMax, medianaMin, medianaC;
 	int gmax, gmin, indMedianaC;
 	//recorrer la matriz de enfermedades por columnas
+
+    #pragma omp parallel private(medianaMax,medianaMin,gmax,gmin,medianaC,indMedianaC,i,j,k,l) num_threads(8)
+        {
+          #pragma omp for schedule(static)
 	for(i=0;i<TENF;i++){
 		//por cada tipo de enfermedad inicializar la mediana max y mediana min
 		medianaMax=-1;
@@ -163,6 +194,7 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 		prob_enf[i].gmax = gmax;
 		prob_enf[i].gmin = gmin;
 	}
+    }
 }
 
 
