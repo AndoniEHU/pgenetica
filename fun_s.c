@@ -8,8 +8,6 @@
 #include <stdlib.h>
 #include "defineg.h"           // definiciones
 #include <stdio.h>
-
-
 /**************************************************************************************
    1 - Funcion para calcular la distancia genetica entre dos elementos (distancia euclidea)
        Entrada:  2 elementos con NCAR caracteristicas (por referencia)
@@ -126,45 +124,38 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 	//		mediana máxima y el grupo en el que se da este máximo (para cada enfermedad)
 	//		mediana mínima y su grupo en el que se da este mínimo (para cada enfermedad)
 	int i, j, k, l;
-	float medianaMax, medianaMin, medianaC;
-	int gmax, gmin, indMedianaC;
-	//recorrer la matriz de enfermedades por columnas
-	for(i=0;i<TENF;i++){
-		//por cada tipo de enfermedad inicializar la mediana max y mediana min
-		medianaMax=-1;
-		medianaMin=FLT_MAX;
-		gmax=-1;
-		gmin=-1;
-		//recorrer cada cluster
-		for(j=0;j<ngrupos;j++){
-			//solo ejectutar si la cantidad de elementos en el cluster es mayor que 0
-			if(listag[j].nelemg>0){
-				//inicializar un array para guardar el numero de probabiliad para conseguir la enfermedad[i] para cada cluster[j]
+	float medianaC;
+	int indMedianaC;
+	
+		// Recorrer cada cluster
+		for (j = 0; j < ngrupos; j++) {
+			// comprobar si el tamaño del cluster[j] > 0
+			if (listag[j].nelemg > 0) {
+				// crear un array del tamaño del cluster[j] para la probabilidad de las enferemdades de cada persona
 				float enf_per[listag[j].nelemg];
-				//guardar todas las personas en el array
-				for(k=0;k<listag[j].nelemg;k++){
-					enf_per[k] = enf[listag[j].elemg[k]][i];
-				}
-				//ordenar el array de menor a mayor
-				qsort(enf_per,listag[j].nelemg,sizeof(float),compare_floats);
-				//conseguir la mediana maxima y minima de esa enfermedad y a que cluster pertenece
-				indMedianaC = floor(listag[j].nelemg / 2);
-				medianaC = enf_per[indMedianaC];
-				if(medianaC > medianaMax){
-					medianaMax = medianaC;
-					gmax = j;
-				}
-				if(medianaC < medianaMin){
-					medianaMin = medianaC;
-					gmin = j;
+				// Recorrer la matriz de enfermedades por columnas
+				for (i = 0; i < TENF; i++) {
+					// Guardar todas las personas en el array para la enfermedad[i]
+					for (k = 0; k < listag[j].nelemg; k++) {	
+						enf_per[k] = enf[listag[j].elemg[k]][i];
+					}
+					// Ordenar el array de menor a mayor
+					qsort(enf_per, listag[j].nelemg, sizeof(float), compare_floats);
+					// Conseguir la mediana de la enfermedad[i]
+					indMedianaC = floor(listag[j].nelemg / 2);
+					medianaC = enf_per[indMedianaC];
+					if ((prob_enf[i].mmax == 0 )|| medianaC > prob_enf[i].mmax) { 
+						prob_enf[i].mmax = medianaC;
+						prob_enf[i].gmax = j;
+					
+					}
+					if ((prob_enf[i].mmin == 0) || medianaC < prob_enf[i].mmin) {
+						prob_enf[i].mmin = medianaC;
+						prob_enf[i].gmin = j;
+					}
 				}
 			}
 		}
-		prob_enf[i].mmax = medianaMax;
-		prob_enf[i].mmin = medianaMin;
-		prob_enf[i].gmax = gmax;
-		prob_enf[i].gmin = gmin;
-	}
 }
 
 
@@ -198,9 +189,12 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 		for (j=0; j<NCAR; j++) additions[popul[i]][j] += elem[i][j];
 		additions[popul[i]][NCAR]++;
 	}
+	
+
 
 	// calcular los nuevos centroides y decidir si el proceso ha finalizado o no (en funcion de DELTA)
 	fin = 1;
+
 	for (i=0; i<ngrupos; i++){
 		if (additions[i][NCAR] > 0) { // ese grupo (cluster) no esta vacio
 			// media de cada caracteristica
@@ -216,6 +210,7 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 			for (j=0; j<NCAR; j++)
 				cent[i][j] = newcent[i][j];
 		}
+
 	}
 	return fin;
 }

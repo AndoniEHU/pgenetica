@@ -1,7 +1,7 @@
 /*
     AC - OpenMP -- SERIE
     fun_s.c
-     rutinas que se utilizan en el modulo gengrupos_s.c
+     rutinas que se utilizan en el modulo gengrupos_s.c 
 ****************************************************************************/
 #include <math.h>
 #include <float.h> // DBL_MAX
@@ -9,9 +9,6 @@
 #include "defineg.h"           // definiciones
 #include <stdio.h>
 #include <omp.h>
-#include <time.h>
-
-
 /**************************************************************************************
    1 - Funcion para calcular la distancia genetica entre dos elementos (distancia euclidea)
        Entrada:  2 elementos con NCAR caracteristicas (por referencia)
@@ -21,13 +18,11 @@ double gendist (float *elem1, float *elem2)
 {
 	// PARA COMPLETAR
 	// calcular la distancia euclidea entre dos vectores
-
 	float sum = 0.0;
 	int i;
 	for(i=0;i<NCAR;i++){
 		sum = sum + pow((elem1[i]-elem2[i]),2);
 	}
-
 	return sqrt(sum);
 }
 
@@ -44,9 +39,6 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 	// popul: grupo mas cercano a cada elemento
 	int i, j, centroide_cercano;
 	float dist_min, aux_dist, centroide_ind = -1;
-	#pragma omp parallel private(i,j,aux_dist,centroide_ind) reduction(min:dist_min) num_threads(8)
-    {
-    #pragma omp for schedule(static)
 	for(i=0;i<nelem;i++){
 		dist_min = FLT_MAX;
 		for(j=0;j<ngrupos;j++){
@@ -57,7 +49,6 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 			}
 		}
 		popul[i] = centroide_ind;
-	}
 	}
 }
 
@@ -151,50 +142,71 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 	//		mediana máxima y el grupo en el que se da este máximo (para cada enfermedad)
 	//		mediana mínima y su grupo en el que se da este mínimo (para cada enfermedad)
 	int i, j, k, l;
-	float medianaMax, medianaMin, medianaC;
-	int gmax, gmin, indMedianaC;
-	//recorrer la matriz de enfermedades por columnas
+	float medianaC;
+	int indMedianaC;
 
-    #pragma omp parallel private(medianaMax,medianaMin,gmax,gmin,medianaC,indMedianaC,i,j,k,l) num_threads(8)
-        {
-          #pragma omp for schedule(static)
-	for(i=0;i<TENF;i++){
-		//por cada tipo de enfermedad inicializar la mediana max y mediana min
-		medianaMax=-1;
-		medianaMin=FLT_MAX;
-		gmax=-1;
-		gmin=-1;
-		//recorrer cada cluster
-		for(j=0;j<ngrupos;j++){
-			//solo ejectutar si la cantidad de elementos en el cluster es mayor que 0
-			if(listag[j].nelemg>0){
-				//inicializar un array para guardar el numero de probabiliad para conseguir la enfermedad[i] para cada cluster[j]
-				float enf_per[listag[j].nelemg];
-				//guardar todas las personas en el array
-				for(k=0;k<listag[j].nelemg;k++){
+	//incializar todos los valores de las medianas
+	for(l=0;l<TENF;l++){
+		prob_enf[l].mmax = -1;
+		prob_enf[l].gmax = 1000;
+		prob_enf[l].mmin = FLT_MAX;
+		prob_enf[l].gmin = 1000;
+	}
+	
+	// Recorrer cada cluster
+	#pragma omp parallel private(i,j,k) shared (prob_enf)
+	{
+	struct analisis prob_enfL[TENF];
+	for (i = 0; i < TENF; i++) {
+        prob_enfL[i].mmax = -1;
+        prob_enfL[i].gmax = 0;
+        prob_enfL[i].mmin = 100;
+        prob_enfL[i].gmin = 0;
+	}
+	#pragma omp for schedule (static)
+	for (j = 0; j < ngrupos; j++) {
+		// comprobar si el tamaño del cluster[j] > 0
+		if (listag[j].nelemg > 0) {
+			// crear un array del tamaño del cluster[j] para la probabilidad de las enferemdades de cada persona
+			float enf_per[listag[j].nelemg];
+			// Recorrer la matriz de enfermedades por columnas
+			for (i = 0; i < TENF; i++) {
+				// Guardar todas las personas en el array para la enfermedad[i]
+				for (k = 0; k < listag[j].nelemg; k++) {	
 					enf_per[k] = enf[listag[j].elemg[k]][i];
 				}
-				//ordenar el array de menor a mayor
-				qsort(enf_per,listag[j].nelemg,sizeof(float),compare_floats);
-				//conseguir la mediana maxima y minima de esa enfermedad y a que cluster pertenece
+				// Ordenar el array de menor a mayor
+				qsort(enf_per, listag[j].nelemg, sizeof(float), compare_floats);
+				// Conseguir la mediana de la enfermedad[i]
 				indMedianaC = floor(listag[j].nelemg / 2);
 				medianaC = enf_per[indMedianaC];
-				if(medianaC > medianaMax){
-					medianaMax = medianaC;
-					gmax = j;
-				}
-				if(medianaC < medianaMin){
-					medianaMin = medianaC;
-					gmin = j;
+				if (medianaC > prob_enfL[i].mmax) {
+                    prob_enfL[i].mmax = medianaC;
+                    prob_enfL[i].gmax = j;
+                }
+                if (medianaC < prob_enfL[i].mmin) {
+    				prob_enfL[i].mmin = medianaC;
+    				prob_enfL[i].gmin = j;
 				}
 			}
+			
 		}
-		prob_enf[i].mmax = medianaMax;
-		prob_enf[i].mmin = medianaMin;
-		prob_enf[i].gmax = gmax;
-		prob_enf[i].gmin = gmin;
 	}
-    }
+	#pragma omp critical
+	{
+	for(i=0;i<TENF;i++){
+		if (prob_enfL[i].mmax > prob_enf[i].mmax || ( prob_enfL[i].mmax >= prob_enf[i].mmax && prob_enfL[i].gmax < prob_enf[i].gmax)) {
+            prob_enf[i].mmax = prob_enfL[i].mmax;
+            prob_enf[i].gmax = prob_enfL[i].gmax;
+        }
+        if (prob_enfL[i].mmin < prob_enf[i].mmin || ( prob_enfL[i].mmin <= prob_enf[i].mmin && prob_enfL[i].gmin < prob_enf[i].gmin)) {
+    		prob_enf[i].mmin = prob_enfL[i].mmin;
+    		prob_enf[i].gmin = prob_enfL[i].gmin;
+		}
+
+	}
+	}
+	}
 }
 
 
@@ -219,11 +231,13 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 	double additions[ngrupos][NCAR+1];
 	float newcent[ngrupos][NCAR];
 
+	#pragma omp parallel for private (i,j) schedule (static)
 	for (i=0; i<ngrupos; i++)
 		for (j=0; j<NCAR+1; j++)
 			additions[i][j] = 0.0;
 
 	// acumular los valores de cada caracteristica (100); numero de elementos al final
+	#pragma omp parallel for private (i,j) reduction (+:additions[:ngrupos][:NCAR+1]) schedule (static)
 	for (i=0; i<nelem; i++){
 		for (j=0; j<NCAR; j++) additions[popul[i]][j] += elem[i][j];
 		additions[popul[i]][NCAR]++;
@@ -231,6 +245,9 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 
 	// calcular los nuevos centroides y decidir si el proceso ha finalizado o no (en funcion de DELTA)
 	fin = 1;
+	#pragma omp parallel private (i,j,discent) reduction (&&:fin)
+	{ 
+	#pragma omp for schedule (static)
 	for (i=0; i<ngrupos; i++){
 		if (additions[i][NCAR] > 0) { // ese grupo (cluster) no esta vacio
 			// media de cada caracteristica
@@ -246,6 +263,7 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 			for (j=0; j<NCAR; j++)
 				cent[i][j] = newcent[i][j];
 		}
+	}
 	}
 	return fin;
 }
