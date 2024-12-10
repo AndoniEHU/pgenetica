@@ -39,6 +39,9 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 	// popul: grupo mas cercano a cada elemento
 	int i, j, centroide_cercano;
 	float dist_min, aux_dist, centroide_ind = -1;
+	#pragma omp parallel private(i,j,aux_dist,centroide_ind,dist_min) shared(popul)
+    {
+    #pragma omp for schedule(static)
 	for(i=0;i<nelem;i++){
 		dist_min = FLT_MAX;
 		for(j=0;j<ngrupos;j++){
@@ -49,6 +52,7 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 			}
 		}
 		popul[i] = centroide_ind;
+	}
 	}
 }
 
@@ -65,62 +69,51 @@ double silhouette_simple(float elem[][NCAR], struct lista_grupos *listag, float 
     float b[ngrupos];
     float s[ngrupos];
     // PARA COMPLETAR
-
 	// aproximar a[i] de cada cluster: calcular la densidad de los grupos
     //		media de las distancia entre todos los elementos del grupo
     //   	si el numero de elementos del grupo es 0 o 1, densidad = 0
-
 	int i, j, k, elemJ, elemK;
 	double sumA, sumB, S=0;
-	struct lista_grupos listaAct;
-    #pragma omp parallel private(listaAct,i,j,k,sumA,elemJ,elemK) shared(a) num_threads(8)
-        {
-        #pragma omp for schedule(static,1)
+    #pragma omp parallel private(i,j,k,sumA,elemJ,elemK) shared(a)
+    {
+    #pragma omp for schedule(static)
 	for(i=0;i<ngrupos;i++){
 		sumA = 0;
-        listaAct = listag[i];
-		if(listaAct.nelemg<=1){
+		if(listag[i].nelemg<=1){
 			a[i] = 0;
 		}else{
-			for(j=0;j<listaAct.nelemg;j++){
-				elemJ = listaAct.elemg[j];
-				for(k=0;k<listaAct.nelemg;k++){
-					elemK = listaAct.elemg[k];
+			for(j=0;j<listag[i].nelemg;j++){
+				elemJ = listag[i].elemg[j];
+				for(k=0;k<listag[i].nelemg;k++){
+					elemK = listag[i].elemg[k];
 					if(j!=k) {
                         sumA += gendist(elem[elemJ],elem[elemK]);
                     }
 				}
 			}
-			a[i] = sumA / pow(abs(listaAct.nelemg),2.0);
+			a[i] = sumA / pow((listag[i].nelemg),2.0);
 		}
 	}
     }
-
-
     // aproximar b[i] de cada cluster
-    #pragma omp parallel private(i,j,sumB) shared(b) num_threads(8)
-      {
-     #pragma omp for schedule(static)
+    #pragma omp parallel private(i,j,sumB) shared(b)
+    {
+    #pragma omp for schedule(static)
 	for(i=0;i<ngrupos;i++){
 		sumB = 0;
 		for (j=0;j<ngrupos;j++){
 			if(i!=j) sumB += gendist(cent[i],cent[j]);
 		}
-		b[i] = sumB / (abs(ngrupos)-1);
+		b[i] = sumB / (ngrupos-1);
 	}
     }
-
 	// calcular el ratio s[i] de cada cluster
 	for(i=0;i<ngrupos;i++){
 		s[i] = (b[i]-a[i])/ fmax(a[i],b[i]);
 		S += s[i];
 	 }
-
-
-
 	// promedio y devolver
-
-    return S/abs(ngrupos);
+    return S/ngrupos;
 }
 
 /********************************************************************************************
