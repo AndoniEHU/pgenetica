@@ -56,6 +56,7 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
 	}
 }
 
+
 /****************************************************************************************
    3 - Funcion para calcular la calidad de la particion de clusteres.
        Ratio entre a y b. El termino a corresponde a la distancia intra-cluster.
@@ -116,6 +117,7 @@ double silhouette_simple(float elem[][NCAR], struct lista_grupos *listag, float 
     return S/ngrupos;
 }
 
+
 /********************************************************************************************
    4 - Funcion para relizar el analisis de enfermedades
    Entrada:  listag   vector de NGRUPOS structs (informacion de grupos generados), por ref.
@@ -123,11 +125,14 @@ double silhouette_simple(float elem[][NCAR], struct lista_grupos *listag, float 
    Salida:   prob_enf vector de TENF structs (informacion del análisis realizado), por ref.
 *****************************************************************************************/
 int compare_floats(const void *a, const void *b){
-	float fa = *(const float*)a;
-	float fb = *(const float*)b;
-	return (fa>fb)-(fa<fb);
+	float fa = *(float*)a;
+	float fb = *(float*)b;
+	if(fa < fb)
+		return -1;
+	else if(fa > fb)
+        return 1;
+    return 0;
 }
-
 void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], struct analisis *prob_enf)
 {
 	// PARA COMPLETAR
@@ -201,6 +206,8 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 	}
 	}
 }
+
+
 
 
 

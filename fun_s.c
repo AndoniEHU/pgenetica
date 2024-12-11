@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include "defineg.h"           // definiciones
 #include <stdio.h>
+#include <omp.h>
 /**************************************************************************************
    1 - Funcion para calcular la distancia genetica entre dos elementos (distancia euclidea)
        Entrada:  2 elementos con NCAR caracteristicas (por referencia)
@@ -32,6 +33,7 @@ double gendist (float *elem1, float *elem2)
              cent   centroides, una matriz de tamanno NGRUPOS x NCAR, por referencia
    Salida:   popul  grupo mas cercano a cada elemento, vector de tamanno MAXE, por referencia
 *****************************************************************************************/
+
 void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popul)
 {
 	// PARA COMPLETAR
@@ -60,6 +62,7 @@ void grupo_cercano (int nelem, float elem[][NCAR], float cent[][NCAR], int *popu
              cent     centroides, una matriz de tamanno NGRUPOS x NCAR, por referencia
    Salida:   valor del CVI (double): calidad/ bondad de la particion de clusters
 *****************************************************************************************/
+
 double silhouette_simple(float elem[][NCAR], struct lista_grupos *listag, float cent[][NCAR], float *a){
     float b[ngrupos];
     float s[ngrupos];
@@ -112,10 +115,16 @@ double silhouette_simple(float elem[][NCAR], struct lista_grupos *listag, float 
    Salida:   prob_enf vector de TENF structs (informacion del análisis realizado), por ref.
 *****************************************************************************************/
 int compare_floats(const void *a, const void *b){
-	float fa = *(const float*)a;
-	float fb = *(const float*)b;
-	return (fa>fb)-(fa<fb);
+	float fa = *(float*)a;
+	float fb = *(float*)b;
+	if(fa < fb)
+		return -1;
+	else if(fa > fb)
+        return 1;
+    return 0;
 }
+
+
 
 void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], struct analisis *prob_enf)
 {
@@ -137,7 +146,7 @@ void analisis_enfermedades (struct lista_grupos *listag, float enf[][TENF], stru
 				for (i = 0; i < TENF; i++) {
 					// Guardar todas las personas en el array para la enfermedad[i]
 					for (k = 0; k < listag[j].nelemg; k++) {	
-						enf_per[k] = enf[listag[j].elemg[k]][i];
+						enf_per[k] = (double)enf[listag[j].elemg[k]][i];
 					}
 					// Ordenar el array de menor a mayor
 					qsort(enf_per, listag[j].nelemg, sizeof(float), compare_floats);
@@ -180,21 +189,23 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 	double additions[ngrupos][NCAR+1];
 	float newcent[ngrupos][NCAR];
 
+	//#pragma omp parallel for private (i,j) schedule (static)
 	for (i=0; i<ngrupos; i++)
 		for (j=0; j<NCAR+1; j++)
 			additions[i][j] = 0.0;
 
 	// acumular los valores de cada caracteristica (100); numero de elementos al final
+	#pragma omp parallel for private (i,j) reduction (+:additions[:ngrupos][:NCAR+1]) schedule (static)
 	for (i=0; i<nelem; i++){
 		for (j=0; j<NCAR; j++) additions[popul[i]][j] += elem[i][j];
 		additions[popul[i]][NCAR]++;
 	}
-	
-
 
 	// calcular los nuevos centroides y decidir si el proceso ha finalizado o no (en funcion de DELTA)
 	fin = 1;
-
+	//#pragma omp parallel private (i,j,discent) reduction (&&:fin)
+	//{ 
+	#pragma omp for schedule (static)
 	for (i=0; i<ngrupos; i++){
 		if (additions[i][NCAR] > 0) { // ese grupo (cluster) no esta vacio
 			// media de cada caracteristica
@@ -210,8 +221,8 @@ int nuevos_centroides(float elem[][NCAR], float cent[][NCAR], int popul[], int n
 			for (j=0; j<NCAR; j++)
 				cent[i][j] = newcent[i][j];
 		}
-
 	}
+	//}
 	return fin;
 }
 
